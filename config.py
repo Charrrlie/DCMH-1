@@ -2,8 +2,8 @@ import warnings
 
 
 class DefaultConfig(object):
-    load_img_path = None  # load model path
-    load_txt_path = None
+    load_img_path = './checkpoints/image_model.pth'  # load model path
+    load_txt_path = './checkpoints/text_model.pth'
 
     # data parameters
     data_path = './data/FLICKR-25K.mat'
