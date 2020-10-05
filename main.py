@@ -1,13 +1,16 @@
-from config import opt
-from data_handler import *
+from tqdm import tqdm
+import gc
+
 import numpy as np
 import torch
 from torch import nn
 from torch.autograd import Variable
 from torch.optim import SGD
-from tqdm import tqdm
+
+from config import opt
 from models import ImgModule, TxtModule
 from utils import calc_map_k
+from data_handler import *
 
 
 def train(**kwargs):
@@ -38,6 +41,10 @@ def train(**kwargs):
     retrieval_L = torch.from_numpy(L['retrieval'])
     retrieval_x = torch.from_numpy(X['retrieval'])
     retrieval_y = torch.from_numpy(Y['retrieval'])
+
+    # gc
+    del images, tags, labels, L, X, Y
+    gc.collect()
 
     num_train = train_x.shape[0]
 
@@ -95,7 +102,13 @@ def train(**kwargs):
             logloss_x = -torch.sum(S * theta_x - torch.log(1.0 + torch.exp(theta_x)))
             quantization_x = torch.sum(torch.pow(B[ind, :] - cur_f, 2))
             balance_x = torch.sum(torch.pow(cur_f.t().mm(ones) + F[unupdated_ind].t().mm(ones_), 2))
-            loss_x = logloss_x + opt.gamma * quantization_x + opt.eta * balance_x
+            
+            # intra loss XXX: added
+            theta_x_intra = 1.0 / 2 * torch.matmul(cur_f, F.t())
+            logloss_x_intra = -torch.sum(S * theta_x_intra - Logtrick(theta_x_intra, opt.use_gpu))
+
+            loss_x = logloss_x + opt.gamma * quantization_x + opt.eta * balance_x + logloss_x_intra
+            #loss_x = logloss_x + opt.gamma * quantization_x + opt.eta * balance_x
             loss_x /= (batch_size * num_train)
 
             optimizer_img.zero_grad()
@@ -128,7 +141,13 @@ def train(**kwargs):
             logloss_y = -torch.sum(S * theta_y - torch.log(1.0 + torch.exp(theta_y)))
             quantization_y = torch.sum(torch.pow(B[ind, :] - cur_g, 2))
             balance_y = torch.sum(torch.pow(cur_g.t().mm(ones) + G[unupdated_ind].t().mm(ones_), 2))
-            loss_y = logloss_y + opt.gamma * quantization_y + opt.eta * balance_y
+            
+            # intra loss XXX:
+            theta_y_intra = 1.0 / 2 * torch.matmul(cur_g, G.t())
+            logloss_y_intra = -torch.sum(S * theta_y_intra - Logtrick(theta_y_intra, opt.use_gpu))
+
+            loss_y = logloss_y + opt.gamma * quantization_y + opt.eta * balance_y + logloss_y_intra
+            #loss_y = logloss_y + opt.gamma * quantization_y + opt.eta * balance_y
             loss_y /= (num_train * batch_size)
 
             optimizer_txt.zero_grad()
@@ -274,8 +293,10 @@ def generate_image_code(img_model, X, bit):
     num_data = X.shape[0]
     index = np.linspace(0, num_data - 1, num_data).astype(int)
     B = torch.zeros(num_data, bit, dtype=torch.float)
+
     if opt.use_gpu:
         B = B.cuda()
+
     for i in tqdm(range(num_data // batch_size + 1)):
         ind = index[i * batch_size: min((i + 1) * batch_size, num_data)]
         image = X[ind].type(torch.float)
@@ -284,6 +305,7 @@ def generate_image_code(img_model, X, bit):
         cur_f = img_model(image)
         B[ind, :] = cur_f.data
     B = torch.sign(B)
+
     return B
 
 
@@ -303,6 +325,13 @@ def generate_text_code(txt_model, Y, bit):
         B[ind, :] = cur_g.data
     B = torch.sign(B)
     return B
+
+def Logtrick(x, use_gpu):
+    if use_gpu:
+        lt = torch.log(1+torch.exp(-torch.abs(x))) + torch.max(x, torch.FloatTensor([0.]).cuda())
+    else:
+        lt = torch.log(1+torch.exp(-torch.abs(x))) + torch.max(x, torch.FloatTensor([0.]))
+    return lt
 
 
 def write_result(result):
