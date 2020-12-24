@@ -6,11 +6,31 @@ class DefaultConfig(object):
     load_txt_path = './checkpoints/text_model.pth'
 
     # data parameters
-    data_path = './data/FLICKR-25K.mat'
+    # data_path = './data/FLICKR-25K.mat'
+    is_FashionVC = True
+    if is_FashionVC:
+        data_path = '/home/ubuntu/chan/SHDCH-pytorch/DataSet/FashionVC'
+        training_size = 16862
+        query_size = 3000
+        database_size = 16862
+
+        num_class1 = 8
+        num_class2 = 27
+
+        num_class = num_class1 + num_class2
+    else:
+        data_path = '/home/ubuntu/chan/SHDCH-pytorch/DataSet/Ssense'
+        training_size = 13696
+        query_size = 2000
+        database_size = 13696
+
+        num_class1 = 4
+        num_class2 = 28
+
+        num_class = num_class1 + num_class2   
+
     pretrain_model_path = './data/imagenet-vgg-f.mat'
-    training_size = 10000
-    query_size = 2000
-    database_size = 18015
+ 
     batch_size = 128
 
     # hyper-parameters

@@ -1,19 +1,16 @@
-import h5py
-import scipy.io as scio
+import scipy.io 
 
 
 def load_data(path):
-    file = h5py.File(path)
-    images = file['images'][:].astype('float')
-    labels = file['LAll'][:]
-    tags = file['YAll'][:]
+    image_path = path + "image.mat"
+    label_path = path + "label.mat"
+    tag_path = path + "tag.mat"
 
-    file.close()
+    images = scipy.io.loadmat(image_path)['Image']   # [19862, 224, 224, 3]
+    tags = scipy.io.loadmat(tag_path)['Tag']     # [19862, 2685]
+    labels = scipy.io.loadmat(label_path)["Label"]    # [19862, 35]
+
     return images, tags, labels
-
-
-def load_pretrain_model(path):
-    return scio.loadmat(path)
 
 
 if __name__ == '__main__':

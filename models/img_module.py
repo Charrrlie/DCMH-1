@@ -1,7 +1,13 @@
 import torch
 from torch import nn
+
+import scipy.misc
+import scipy.io
+
 from models.basic_module import BasicModule
 
+
+MODEL_DIR = '/home/ubuntu/chan/SHDCH-pytorch/DataSet/imagenet-vgg-f.mat'
 
 class ImgModule(BasicModule):
     def __init__(self, bit, pretrain_model=None):
@@ -50,16 +56,20 @@ class ImgModule(BasicModule):
         )
         # fc8
         self.classifier = nn.Linear(in_features=4096, out_features=bit)
-        self.classifier.weight.data = torch.randn(bit, 4096) * 0.01
-        self.classifier.bias.data = torch.randn(bit) * 0.01
         self.mean = torch.zeros(3, 224, 224)
-        if pretrain_model:
-            self._init(pretrain_model)
-
+        
+        self._init()
+       
     def _init(self, data):
+        # classifier init
+        self.classifier.weight.data = torch.randn(self.bit, 4096) * 0.01
+        self.classifier.bias.data = torch.randn(self.bit) * 0.01
+
+        data = scipy.io.loadmat(MODEL_DIR)
         weights = data['layers'][0]
         self.mean = torch.from_numpy(data['normalization'][0][0][0].transpose()).type(torch.float)
         for k, v in self.features.named_children():
+            # TODO: other module init
             k = int(k)
             if isinstance(v, nn.Conv2d):
                 if k > 1:
@@ -68,6 +78,9 @@ class ImgModule(BasicModule):
                 v.bias.data = torch.from_numpy(weights[k][0][0][0][0][1].reshape(-1))
 
     def forward(self, x):
+        # [batch_size, 224, 224, 3]
+        x = x.permute(0, 3, 2, 1) 
+        # [batch_size, 3, 224, 224]
         if x.is_cuda:
             x = x - self.mean.cuda()
         else:
@@ -76,5 +89,4 @@ class ImgModule(BasicModule):
         x = x.squeeze()
         x = self.classifier(x)
         return x
-
 

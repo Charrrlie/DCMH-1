@@ -10,37 +10,36 @@ from torch.optim import SGD
 from config import opt
 from models import ImgModule, TxtModule
 from utils import calc_map_k
-from data_handler import *
+from data_handler import load_data
 
 
 def train(**kwargs):
     opt.parse(kwargs)
 
     images, tags, labels = load_data(opt.data_path)
-    pretrain_model = load_pretrain_model(opt.pretrain_model_path)
     y_dim = tags.shape[1]
 
     X, Y, L = split_data(images, tags, labels)
     print('...loading and splitting data finish')
 
-    img_model = ImgModule(opt.bit, pretrain_model)
+    img_model = ImgModule(opt.bit)
     txt_model = TxtModule(y_dim, opt.bit)
 
     if opt.use_gpu:
         img_model = img_model.cuda()
         txt_model = txt_model.cuda()
 
-    train_L = torch.from_numpy(L['train'])
-    train_x = torch.from_numpy(X['train'])
-    train_y = torch.from_numpy(Y['train'])
+    train_L = torch.from_numpy(L['train']).float()
+    train_x = torch.from_numpy(X['train']).float()
+    train_y = torch.from_numpy(Y['train']).float()
 
-    query_L = torch.from_numpy(L['query'])
-    query_x = torch.from_numpy(X['query'])
-    query_y = torch.from_numpy(Y['query'])
+    query_L = torch.from_numpy(L['query']).float()
+    query_x = torch.from_numpy(X['query']).float()
+    query_y = torch.from_numpy(Y['query']).float()
 
-    retrieval_L = torch.from_numpy(L['retrieval'])
-    retrieval_x = torch.from_numpy(X['retrieval'])
-    retrieval_y = torch.from_numpy(Y['retrieval'])
+    retrieval_L = torch.from_numpy(L['retrieval']).float()
+    retrieval_x = torch.from_numpy(X['retrieval']).float()
+    retrieval_y = torch.from_numpy(Y['retrieval']).float()
 
     # gc
     del images, tags, labels, L, X, Y
@@ -252,6 +251,11 @@ def test(**kwargs):
 
 
 def split_data(images, tags, labels):
+    shuffle_idx = np.random.permutation(np.arange(len(images)))
+    images = images[shuffle_idx]
+    tags = tags[shuffle_idx]
+    labels = labels[shuffle_idx]
+
     X = {}
     X['query'] = images[0: opt.query_size]
     X['train'] = images[opt.query_size: opt.training_size + opt.query_size]
